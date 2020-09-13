@@ -1,0 +1,116 @@
+---
+title: "Segmentação de Clientes"
+output:
+  html_notebook: default
+  html_document:
+    keep_md: yes
+---
+```{r setup, include=FALSE}
+#install.packages("dplyr")
+#install.packages("tidyr")
+#install.packages("plotly")
+library(dplyr)
+library(rpart)
+library(rpart.plot)
+library(ggplot2)
+library(plotly)
+
+```
+
+# Problemática
+
+## Conhecendo os dados
+
+```{r}
+data <- read.csv('Mall_Customers.csv', col.names = c('id', 'sexo','idade', 'receita', 'score'))
+data$sexo = as.factor(data$sexo)
+head(data)
+str(data)
+```
+
+
+## Visualizando
+```{r}
+
+ggplot(data, aes(x = idade,y = score)) +
+  geom_point() +
+  ggtitle("Distribuição dos Clientes", subtitle = "por score e idade") +
+  ylab("Score") +
+  xlab("Idade")
+```
+
+## Método do Cotovelo
+```{r}
+k_data <- data[,c(3,5)]
+
+num_k <- 1:10
+
+elbow  <- sapply(num_k, function(k) {
+  cl <- kmeans(k_data, k, nstart = 10)
+  cl$tot.withinss
+})
+
+ggplot()
+plot(num_k, elbow , type = "b",
+     xlab="Numero de Clusters",
+     ylab="Soma dos Quadrados")
+```
+
+
+
+## Clusterização
+
+```{r}
+
+result_kmeans <- kmeans(data[,c(3,5)], 4, nstart = 10)
+
+data$perfil <- as.factor(result_kmeans$cluster)
+head(data)
+
+
+```
+
+### Resultado da Clusterização
+```{r}
+result_kmeans
+```
+
+### Novo conjunto de dados
+```{r}
+head(data)
+```
+
+
+```{r}
+ggplot(data, aes(x = idade, y = score, z = receita)) + 
+  geom_point(stat = "identity", aes(color = as.factor(result_kmeans$cluster))) +
+  scale_color_discrete(
+    name=" ",
+    labels=c("Perfil 1", "Perfil 2", "Perfil 3", "Perfil 4")
+  ) +
+  
+  ggtitle(
+    "Segmentação de Clientes", 
+    subtitle = "Definindo perfils de clientes"
+  ) +
+  ylab("Spending Score")
+
+
+data %>%
+  group_by(perfil) %>%
+  summarise(
+    total =n(), 
+    idade_min = min(idade), 
+    idade_max = max(idade),
+    score_min = min(score), 
+    score_max = max(score),
+)
+```
+
+
+
+### Entendendo melhor o que influência os perfils
+```{r}
+fit <- rpart(perfil~idade+score, data = data, method = 'class')
+rpart.plot(fit)
+```
